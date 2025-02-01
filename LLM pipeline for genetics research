@@ -1,4 +1,5 @@
 #LLM pipeline for research paper creation (experimentation)
+# Pre-Requirements: #Run deepseekr1:1.5b using Ollama
 from langchain_ollama import OllamaLLM
 import re
 
