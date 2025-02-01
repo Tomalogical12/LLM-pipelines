@@ -1,0 +1,127 @@
+#LLM pipeline for research paper creation (experimentation)
+from langchain_ollama import OllamaLLM
+import re
+
+# Initialize the LLM from Ollama
+model = OllamaLLM(model="deepseek-r1:1.5b")
+
+# Define the <think> block deleting function
+def clean_output(text):
+    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+
+# Step 0: Define the Topic
+topic = "genetics"
+
+# Step 1.1: Brainstorm Ideas
+brainstorm_prompt1 = f"""
+You are a research assistant brainstorming ideas for a two-page research paper on {topic}. 
+Provide a comprehensive list of potential topics and approaches related to genetic research, 
+ensuring a wide range of perspectives and innovative concepts.
+"""
+print(" 1.1  BRAINSTORM PROMPT:")
+print(brainstorm_prompt1)
+print("\n" + "-"*20 + "\n")
+
+brainstorm_results1 = model.invoke(input=brainstorm_prompt1)
+print("BRAINSTORM RESULTS 1:")
+print(brainstorm_results1)
+print("\n" + "-"*80 + "\n")
+
+# LOOP
+max_iterations = 100
+current_iteration = 0
+
+while current_iteration < max_iterations:
+    current_iteration += 1
+    print(f"--- ITERATION {current_iteration} ---\n")
+
+    # Step 1.2: Brainstorm Ideas
+    brainstorm_prompt2 = f"""
+    You are a research assistant brainstorming ideas for a two-page research paper on {topic} in which an LLM could do a good job doing the research. 
+    Based on the following ideas from the last iteration, brainstorm 10 new ones without redundancy. 
+    The output must be a combined list of all old and new ideas (so about 19-20 ideas) with no order necessary.
+    Current Ideas: "{clean_output(brainstorm_results1)}"
+    """
+    print(f" 1.2  BRAINSTORM PROMPT ({current_iteration}):")
+    print(brainstorm_prompt2)
+    print("\n" + "-" * 20 + "\n")
+
+    brainstorm_results2 = model.invoke(input=brainstorm_prompt2)
+    print(f"BRAINSTORM OUTPUT ({current_iteration}):")
+    print(brainstorm_results2)
+    print("\n" + "-"*80 + "\n")
+
+    # Step 2: Evaluate and Discard Ideas
+    evaluate_prompt = f"""
+    Using the following list of ideas, evaluate and rank them from best to worst and then discard the worst ones to be left with the top 10 in order
+    based on how good the idea could perform with an LLM-based research pipeline, if the idea seems feasible and other factors. The final output must be a list of the top 10 ideas only ranked (don't show the discarded ideas)
+    Here is the list: "{clean_output(brainstorm_results2)}"
+    """
+    print(f" 2.0  EVALUATE AND DISCARD IDEAS PROMPT ({current_iteration}):")
+    print(evaluate_prompt)
+    print("\n" + "-" * 20 + "\n")
+
+    prioritized_ideas = model.invoke(input=evaluate_prompt)
+    print(f"EVALUATE AND DISCARD IDEAS OUTPUT ({current_iteration}):")
+    print(prioritized_ideas)
+    print("\n" + "-"*80 + "\n")
+
+    # Step 3.1: Choose the Idea
+    summarize_prompt = f"""
+    From the ranked list of genetics topics given, choose one of the top 3 ideas and rephrase/summarise it into one concise sentence as output..
+    Here is the list: "{clean_output(prioritized_ideas)}"
+    """
+    print(f" 3.1  CHOOSING PROMPT ({current_iteration}):")
+    print(summarize_prompt)
+    print("\n" + "-" * 20 + "\n")
+
+    selected_idea_summary = model.invoke(input=summarize_prompt)
+    print(f"CHOOSING, OUTPUT ({current_iteration}):")
+    print(selected_idea_summary)
+    print("\n" + "-"*80 + "\n")
+
+    # Step 3.2: List without chosen prompt.
+    delete_prompt = f"""
+    from the chosen subject, rewrite the list without the chosen prompt: 
+    list: "{clean_output(prioritized_ideas)}" 
+    chosen prompt: "{clean_output(selected_idea_summary)}"
+    """
+    print(f" 3.2  DELETE PROMPT FROM LIST ({current_iteration}):")
+    print(delete_prompt)
+    print("\n" + "-" * 20 + "\n")
+
+    updated_ideas = model.invoke(input=delete_prompt)
+    print(f"DELETE IDEA FROM LIST, OUTPUT ({current_iteration}):")
+    print(updated_ideas)
+    print("\n" + "-"*80 + "\n")
+    brainstorm_results1 = updated_ideas # will update the brainstorm results to be the evaluated version (for the next loop)
+
+
+    # Step 4: Develop a Detailed Outline
+    outline_prompt = f"""
+    Develop a detailed outline and potential solutions or methodologies that could be explored 
+    in a two-page research paper outline on "{clean_output(selected_idea_summary)}".
+    """
+    print(f"  4.0  OUTLINE PROMPT ({current_iteration}):")
+    print(outline_prompt)
+    print("\n" + "-" * 20 + "\n")
+
+    research_paper_outline = model.invoke(input=outline_prompt)
+    print(f"OUTLINE OUTPUT ({current_iteration}):")
+    print(research_paper_outline)
+    print("\n" + "-"*80 + "\n")
+
+    # Step 5: Generate the Final Research Paper
+    final_paper_prompt = f"""
+    Using the following outline and methodologies, write a comprehensive two-page research paper 
+    on the topic of genetics. Ensure proper formatting, clarity, and academic tone.
+    Here is the Outline:"{clean_output(research_paper_outline)}"
+    """
+    print(f"  5.0  RESEARCH PAPER ({current_iteration}):")
+    print(final_paper_prompt)
+    print("\n" + "-" * 20 + "\n")
+
+    final_research_paper = model.invoke(input=final_paper_prompt)
+    print(f"RESEARCH PAPER ({current_iteration}):")
+    print(final_research_paper)
+    print("\n" + "-"*160 + "\n")
