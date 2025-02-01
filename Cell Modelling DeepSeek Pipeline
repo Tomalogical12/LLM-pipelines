@@ -1,0 +1,140 @@
+from langchain_ollama import OllamaLLM
+import re
+import sys
+import time
+
+# Initialise the LLM
+model = OllamaLLM(model="deepseek-r1:1.5b")
+
+# Helper function to remove any hidden chain‐of‐thought
+def clean_output(text):
+    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+
+# Define the simulation domain and initial parameters
+topic = "cell modelling"  # Proteins as nodes and their interactions as connections
+
+# Initial Brainstorming of the Cell Model
+initial_brainstorm_prompt = f"""
+You are a research assistant tasked with designing a simplistic cell model.
+Represent each protein as a neuron and describe their basic interactions (inhibitory or activating).
+Brainstorm an initial list of protein nodes and interactions based on current research.
+Output each entry in the format "Protein: Interaction".
+"""
+initial_brainstorm_results = clean_output(model.invoke(input=initial_brainstorm_prompt))
+print("Initial Brainstorm Results:")
+print(initial_brainstorm_results)
+print("\n" + "-"*80 + "\n")
+
+# Initialise the idea stack with the initial configuration (assuming one idea per line)
+idea_stack = initial_brainstorm_results.split('\n')
+
+# Define maximum number of iterations for refinement
+max_iterations = 5
+current_iteration = 0
+
+while current_iteration < max_iterations:
+    current_iteration += 1
+    print(f"--- ITERATION {current_iteration} ---\n")
+    
+    # Brainstorm New Ideas using current stack as context
+    brainstorm_prompt = f"""
+    You are a research assistant refining a cell model.
+    Based on the following current protein nodes and interactions (each in the format "Protein: Interaction"),
+    brainstorm 10 new protein nodes and interactions without redundancy.
+    Then output a combined list of all old and new ideas (approximately 20 total) in any order.
+    
+    Current Ideas:
+    {', '.join(idea_stack)}
+    """
+    new_brainstorm_results = clean_output(model.invoke(input=brainstorm_prompt))
+    print("Brainstorm New Ideas:")
+    print(new_brainstorm_results)
+    print("\n" + "-"*80 + "\n")
+    
+    # Evaluate and Prioritise the Ideas: Retain the top 10 interactions
+    evaluation_prompt = f"""
+    Using the following list of protein nodes and interactions, evaluate and rank them according to their importance
+    in a simplistic cell functioning. Discard the less relevant ones so that only the top 10 key interactions remain.
+    
+    Here is the list:
+    {new_brainstorm_results}
+    """
+    prioritized_ideas = clean_output(model.invoke(input=evaluation_prompt))
+    print("Prioritised Ideas:")
+    print(prioritised_ideas)
+    print("\n" + "-"*80 + "\n")
+    
+    # Extract the top 10 ideas (assuming one per line)
+    top_10_ideas = prioritized_ideas.split('\n')[:10]
+    print("Top 10 Ideas:")
+    for idx, idea in enumerate(top_10_ideas, 1):
+        print(f"{idx}. {idea}")
+    print("\n" + "-"*80 + "\n")
+    
+    # Simulation Code Generation: Generate simple Python code to simulate the cell
+    simulation_code_prompt = f"""
+    Based on the following top 10 protein nodes and their interactions (each in the format "Protein: Interaction"),
+    generate simple Python code that simulates a cell model. In the simulation, each node represents a protein and each
+    connection (inhibitory or activating) represents an interaction. The code should be simplistic and modular.
+    
+    Top 10 Ideas:
+    {', '.join(top_10_ideas)}
+    
+    Output the Python code as plain text.
+    """
+    simulation_code = clean_output(model.invoke(input=simulation_code_prompt))
+    print("Simulation Code:")
+    print(simulation_code)
+    print("\n" + "-"*80 + "\n")
+    
+    # Run Simulation and Gather Results:
+    # (Here we simulate the process by asking the LLM to analyse the generated code)
+    simulation_analysis_prompt = f"""
+    Assume the following Python code simulates a cell model with the given protein interactions.
+    Analyse the simulation results. Identify any inaccuracies or missing interactions.
+    Search current research for additional insights on protein effects and interactions.
+    Provide an analysis report with suggestions to improve the simulation.
+    
+    Simulation Code:
+    {simulation_code}
+    """
+    simulation_analysis = clean_output(model.invoke(input=simulation_analysis_prompt))
+    print("Simulation Analysis:")
+    print(simulation_analysis)
+    print("\n" + "-"*80 + "\n")
+    
+    # Backtracking: Update the Idea Stack using simulation analysis and research insights
+    update_prompt = f"""
+    Based on the following simulation analysis and research context on protein interactions,
+    update the list of protein nodes and interactions. Include any additional inhibitory, activating,
+    or gradient interactions needed to improve the cell model's accuracy.
+    Output the updated list in the format "Protein: Interaction" per line.
+    
+    Simulation Analysis:
+    {simulation_analysis}
+    
+    Current Top 10 Ideas:
+    {', '.join(top_10_ideas)}
+    """
+    updated_ideas = clean_output(model.invoke(input=update_prompt))
+    print("Updated Ideas:")
+    print(updated_ideas)
+    print("\n" + "-"*80 + "\n")
+    
+    # Update the idea stack for the next iteration
+    idea_stack = updated_ideas.split('\n')
+    
+    # Optional delay to manage rate limits
+    time.sleep(2)
+
+# Final Output: Generate and output the final refined simulation code and model description
+final_output_prompt = f"""
+Based on the iterative refinements, provide the final, improved Python code that simulates a cell model.
+The simulation should accurately represent protein nodes (as neurons) and their interactions 
+(inhibitory/activating, with gradients). Additionally, provide a brief description of how the cell model works.
+"""
+final_simulation_code = clean_output(model.invoke(input=final_output_prompt))
+print("Final Simulation Code and Model Description:")
+print(final_simulation_code)
+
+print("All iterations completed.")
